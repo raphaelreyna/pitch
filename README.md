@@ -1,6 +1,6 @@
 # PitCH
 Like tar but different.
-PitCH is an archive file format that aims for high performance and and minimal bloat.
+PitCH is an archive file format that aims for high performance and minimal bloat.
 
 ## PitCH vs tar
 - PitCH header sections add at least 3 bytes to the archive and grow as `O(log(n))` where `n` is file name size or file content size.
