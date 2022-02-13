@@ -136,7 +136,7 @@ func extractFn() error {
 	var pr = pitch.NewReader(r)
 
 	for {
-		name, err := pr.Next()
+		name, _, err := pr.Next()
 		if errors.Is(err, io.EOF) {
 			return nil
 		}

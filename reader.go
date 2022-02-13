@@ -20,37 +20,37 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-func (rdr *Reader) Next() (name string, err error) {
+func (rdr *Reader) Next() (name string, size int64, err error) {
 	if err := rdr.discardContent(); err != nil {
-		return "", fmt.Errorf("error reading the next header: %w", err)
+		return "", 0, fmt.Errorf("error reading the next header: %w", err)
 	}
 
-	size, err := rdr.readSize()
+	s, err := rdr.readSize()
 	if errors.Is(err, io.EOF) {
-		return "", err
+		return "", 0, err
 	}
 	if err != nil {
-		return "", fmt.Errorf("error reading file name size: %w", err)
+		return "", 0, fmt.Errorf("error reading file name size: %w", err)
 	}
 
 	var (
 		r       = rdr.r
-		nameBuf = make([]byte, size)
+		nameBuf = make([]byte, s)
 	)
 
 	_, err = io.ReadFull(r, nameBuf)
 	if err != nil {
-		return "", fmt.Errorf("error reading header byte: %w", err)
+		return "", 0, fmt.Errorf("error reading header byte: %w", err)
 	}
 
-	size, err = rdr.readSize()
+	s, err = rdr.readSize()
 	if err != nil {
-		return "", fmt.Errorf("error reading file size: %w", err)
+		return "", 0, fmt.Errorf("error reading file size: %w", err)
 	}
 
-	rdr.contentReader.N = size
+	rdr.contentReader.N = s
 
-	return string(nameBuf), nil
+	return string(nameBuf), s, nil
 }
 
 func (rdr *Reader) Read(b []byte) (int, error) {

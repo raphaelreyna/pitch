@@ -69,7 +69,7 @@ func TestCoherence(t *testing.T) {
 
 			var unmatchedFiles = len(files)
 			for 0 < unmatchedFiles {
-				name, err := r.Next()
+				name, size, err := r.Next()
 				is.NoErr(err)
 
 				fmt.Printf("name: %s\n", name)
@@ -79,6 +79,7 @@ func TestCoherence(t *testing.T) {
 				contents, err := io.ReadAll(r)
 				is.NoErr(err)
 
+				is.Equal(int(size), len(expectedContents))
 				is.Equal(contents, expectedContents)
 
 				unmatchedFiles--

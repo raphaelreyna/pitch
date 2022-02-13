@@ -21,7 +21,7 @@ func TestReader_ReadSize_DiscardErr(t *testing.T) {
 
 	r.contentReader.N = 1
 
-	name, err := r.Next()
+	name, _, err := r.Next()
 	is.True(err != nil)
 	is.Equal(name, "")
 }
@@ -40,7 +40,7 @@ func TestReader_ReadSize_DiscardEOF(t *testing.T) {
 
 	r.contentReader.N = 1
 
-	name, err := r.Next()
+	name, _, err := r.Next()
 	is.True(err != nil)
 	is.Equal(name, "")
 }
@@ -57,7 +57,7 @@ func TestReader_ReadSizeEOF(t *testing.T) {
 		r = NewReader(&er)
 	)
 
-	name, err := r.Next()
+	name, _, err := r.Next()
 	is.True(err != nil)
 	is.Equal(name, "")
 }
@@ -74,7 +74,7 @@ func TestReader_ReadSizeErr(t *testing.T) {
 		r = NewReader(&er)
 	)
 
-	name, err := r.Next()
+	name, _, err := r.Next()
 	is.True(err != nil)
 	is.Equal(name, "")
 }
