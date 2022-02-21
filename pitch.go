@@ -1,11 +1,116 @@
 package pitch
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 )
+
+func BuildTableOfContents(v interface{}) (TableOfContents, error) {
+	switch x := v.(type) {
+	case []byte:
+		var buf = bytes.NewReader(x)
+		return buildTableOfContentsFromSeeker(buf)
+	case io.ReadSeeker:
+		return buildTableOfContentsFromSeeker(x)
+	case io.Reader:
+		return buildTableOfContentsFromReader(x)
+	}
+
+	return nil, errors.New("expected []byte, io.Reader or io.ReadSeeker")
+}
+
+func buildTableOfContentsFromReader(r io.Reader) (TableOfContents, error) {
+	var (
+		toc    = make(TableOfContents)
+		pr     = NewReader(r)
+		offset int64
+	)
+
+	for {
+		var bytesRead int64
+
+		nameSize, br, err := pr.readSize()
+		if errors.Is(err, io.EOF) {
+			return toc, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		bytesRead += br
+
+		var nameBuf = make([]byte, nameSize)
+		_, err = io.ReadFull(pr, nameBuf)
+		if err != nil {
+			return nil, err
+		}
+
+		toc[string(nameBuf)] = offset
+		bytesRead += nameSize
+
+		contentSize, br, err := pr.readSize()
+		if err != nil {
+			return nil, err
+		}
+
+		bytesRead += br + contentSize
+
+		offset += bytesRead
+
+		_, err = io.CopyN(io.Discard, r, contentSize)
+		if err != nil {
+			return nil, err
+		}
+	}
+}
+
+func buildTableOfContentsFromSeeker(r io.ReadSeeker) (TableOfContents, error) {
+	var (
+		toc    = make(TableOfContents)
+		pr     = NewReader(r)
+		offset int64
+	)
+
+	for {
+		var bytesRead int64
+
+		nameSize, br, err := pr.readSize()
+		if errors.Is(err, io.EOF) {
+			return toc, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		bytesRead += br
+
+		var nameBuf = make([]byte, nameSize)
+		_, err = io.ReadFull(pr.r, nameBuf)
+		if err != nil {
+			return nil, err
+		}
+
+		toc[string(nameBuf)] = offset
+		bytesRead += nameSize
+
+		contentSize, br, err := pr.readSize()
+		if err != nil {
+			return nil, err
+		}
+
+		bytesRead += br + contentSize
+
+		offset += bytesRead
+
+		if _, err := r.Seek(offset, 0); err != nil {
+			return nil, err
+		}
+	}
+}
 
 func ArchiveDir(dst io.WriteCloser, dir string) error {
 	var pw = NewWriter(dst)

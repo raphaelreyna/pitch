@@ -25,7 +25,7 @@ func (rdr *Reader) Next() (name string, size int64, err error) {
 		return "", 0, fmt.Errorf("error reading the next header: %w", err)
 	}
 
-	s, err := rdr.readSize()
+	s, _, err := rdr.readSize()
 	if errors.Is(err, io.EOF) {
 		return "", 0, err
 	}
@@ -43,7 +43,7 @@ func (rdr *Reader) Next() (name string, size int64, err error) {
 		return "", 0, fmt.Errorf("error reading header byte: %w", err)
 	}
 
-	s, err = rdr.readSize()
+	s, _, err = rdr.readSize()
 	if err != nil {
 		return "", 0, fmt.Errorf("error reading file size: %w", err)
 	}
@@ -71,19 +71,22 @@ func (rdr *Reader) discardContent() error {
 	return err
 }
 
-func (rdr *Reader) readSize() (int64, error) {
+func (rdr *Reader) readSize() (int64, int64, error) {
 	const lbMask = 0b00000001
 	var (
 		r    = rdr.r
 		size int64
 		buf  = make([]byte, 1)
+		n    int64
 	)
 
 	for {
 		_, err := r.Read(buf)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
+
+		n++
 
 		var (
 			x   = buf[0]
@@ -99,5 +102,5 @@ func (rdr *Reader) readSize() (int64, error) {
 		}
 	}
 
-	return size, nil
+	return size, n, nil
 }

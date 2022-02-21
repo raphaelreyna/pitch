@@ -9,7 +9,7 @@ import (
 	"github.com/matryer/is"
 )
 
-func TestCoherence(t *testing.T) {
+func TestBuildTableOfContents(t *testing.T) {
 	var (
 		is = is.New(t)
 
@@ -64,24 +64,38 @@ func TestCoherence(t *testing.T) {
 			err := w.Close()
 			is.NoErr(err)
 
-			var r = NewReader(buf)
+			toc, err := BuildTableOfContents(buf.Bytes())
+			is.NoErr(err)
 
-			var unmatchedFiles = len(files)
-			for 0 < unmatchedFiles {
-				name, size, err := r.Next()
+			var (
+				unmatchedFiles = len(files)
+				br             = bytes.NewReader(buf.Bytes())
+				r              = NewReader(br)
+			)
+
+			for name, loc := range toc {
+				_, err := br.Seek(loc, 0)
 				is.NoErr(err)
 
-				expectedContents, nameExists := files[name]
-				is.True(nameExists)
-
-				contents, err := io.ReadAll(r)
+				readName, readSize, err := r.Next()
 				is.NoErr(err)
 
-				is.Equal(int(size), len(expectedContents))
-				is.Equal(contents, expectedContents)
+				is.Equal(readName, name)
+
+				content, ok := files[readName]
+				is.True(ok)
+
+				is.Equal(readSize, int64(len(content)))
+
+				readContent, err := io.ReadAll(r)
+				is.NoErr(err)
+
+				is.Equal(content, readContent)
 
 				unmatchedFiles--
 			}
+
+			is.Equal(unmatchedFiles, 0)
 		})
 	}
 }
