@@ -136,18 +136,3 @@ func TestWriter_Close_PadWriteError(t *testing.T) {
 	err := w.Close()
 	is.True(err != nil)
 }
-
-type errWriter struct {
-	errors []error
-}
-
-func (ew *errWriter) Write(b []byte) (int, error) {
-	var err error
-
-	err, ew.errors = ew.errors[0], ew.errors[1:]
-	if err == nil {
-		return len(b), nil
-	}
-
-	return 0, err
-}
