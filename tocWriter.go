@@ -126,7 +126,7 @@ func (wtr *TOCWriter) pad() error {
 }
 
 func (wtr *TOCWriter) writeSize(size int64) error {
-	if size < 0 {
+	if size < 1 {
 		return ErrInvalidSize
 	}
 
