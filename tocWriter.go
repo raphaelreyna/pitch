@@ -6,7 +6,12 @@ import (
 	"math"
 )
 
-type TableOfContents map[string]int64
+type ByteRange struct {
+	Start int64
+	End   int64
+}
+
+type TableOfContents map[string]ByteRange
 
 type TOCWriter struct {
 	contentLength int64
@@ -27,8 +32,6 @@ func (wtr *TOCWriter) WriteHeader(name string, contentLength int64) error {
 	if w == nil {
 		return ErrClosed
 	}
-
-	wtr.toc[name] = wtr.offset
 
 	if err := wtr.pad(); err != nil {
 		return fmt.Errorf("error padding file: %w", err)
@@ -52,6 +55,10 @@ func (wtr *TOCWriter) WriteHeader(name string, contentLength int64) error {
 	}
 
 	wtr.contentLength = contentLength
+	wtr.toc[name] = ByteRange{
+		Start: wtr.offset,
+		End:   wtr.offset + contentLength,
+	}
 
 	return nil
 }

@@ -44,12 +44,11 @@ func buildTableOfContentsFromReader(r io.Reader) (TableOfContents, error) {
 		bytesRead += br
 
 		var nameBuf = make([]byte, nameSize)
-		_, err = io.ReadFull(pr, nameBuf)
+		_, err = io.ReadFull(pr.r, nameBuf)
 		if err != nil {
 			return nil, err
 		}
 
-		toc[string(nameBuf)] = offset
 		bytesRead += nameSize
 
 		contentSize, br, err := pr.readSize()
@@ -57,14 +56,20 @@ func buildTableOfContentsFromReader(r io.Reader) (TableOfContents, error) {
 			return nil, err
 		}
 
-		bytesRead += br + contentSize
-
+		bytesRead += br
 		offset += bytesRead
 
 		_, err = io.CopyN(io.Discard, r, contentSize)
 		if err != nil {
 			return nil, err
 		}
+
+		toc[string(nameBuf)] = ByteRange{
+			Start: offset,
+			End:   offset + contentSize,
+		}
+
+		offset += contentSize
 	}
 }
 
@@ -94,7 +99,6 @@ func buildTableOfContentsFromSeeker(r io.ReadSeeker) (TableOfContents, error) {
 			return nil, err
 		}
 
-		toc[string(nameBuf)] = offset
 		bytesRead += nameSize
 
 		contentSize, br, err := pr.readSize()
@@ -102,13 +106,19 @@ func buildTableOfContentsFromSeeker(r io.ReadSeeker) (TableOfContents, error) {
 			return nil, err
 		}
 
-		bytesRead += br + contentSize
-
+		bytesRead += br
 		offset += bytesRead
 
-		if _, err := r.Seek(offset, 0); err != nil {
+		if _, err := r.Seek(offset+contentSize, 0); err != nil {
 			return nil, err
 		}
+
+		toc[string(nameBuf)] = ByteRange{
+			Start: offset,
+			End:   offset + contentSize,
+		}
+
+		offset += contentSize
 	}
 }
 
