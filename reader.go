@@ -104,3 +104,12 @@ func (rdr *Reader) readSize() (int64, int64, error) {
 
 	return size, n, nil
 }
+
+func (r *Reader) Close() error {
+	var c, ok = r.r.(io.Closer)
+	if ok {
+		return c.Close()
+	}
+
+	return nil
+}
