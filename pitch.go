@@ -135,7 +135,7 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 			return nil
 		}
 
-		if err := pw.WriteHeader(path, info.Size()); err != nil {
+		if _, err := pw.WriteHeader(path, info.Size()); err != nil {
 			return err
 		}
 

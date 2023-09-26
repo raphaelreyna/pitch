@@ -17,10 +17,11 @@ func TestWriter_ErrClosed(t *testing.T) {
 	err := w.Close()
 	is.True(errors.Is(err, ErrClosed))
 
-	err = w.WriteHeader("", 1)
+	n, err := w.WriteHeader("", 1)
+	is.Equal(n, 0)
 	is.True(errors.Is(err, ErrClosed))
 
-	n, err := w.Write([]byte{10})
+	n, err = w.Write([]byte{10})
 	is.True(errors.Is(err, ErrClosed))
 	is.Equal(n, 0)
 }
@@ -32,10 +33,11 @@ func TestWriter_ErrWriteTooLong(t *testing.T) {
 		w   = NewWriter(buf)
 	)
 
-	err := w.WriteHeader("name", 1)
+	n, err := w.WriteHeader("name", 1)
 	is.NoErr(err)
+	is.Equal(n, headerSize("name", 1))
 
-	n, err := w.Write([]byte{10, 10})
+	n, err = w.Write([]byte{10, 10})
 	is.True(errors.Is(err, ErrWriteTooLong))
 	is.Equal(n, 1)
 
@@ -51,8 +53,9 @@ func TestWriter_NegativeContentSize(t *testing.T) {
 		w   = NewWriter(buf)
 	)
 
-	err := w.WriteHeader("name", -1)
+	n, err := w.WriteHeader("name", -1)
 	is.True(errors.Is(err, ErrInvalidSize))
+	is.Equal(n, 0)
 }
 
 func TestWriter_WriteHeader_PadError(t *testing.T) {
@@ -66,8 +69,9 @@ func TestWriter_WriteHeader_PadError(t *testing.T) {
 		w = NewWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	n, err := w.WriteHeader("name", 1)
 	is.True(err != nil)
+	is.Equal(n, 0)
 }
 
 func TestWriter_WriteHeader_WriteNameLengthError(t *testing.T) {
@@ -82,8 +86,9 @@ func TestWriter_WriteHeader_WriteNameLengthError(t *testing.T) {
 		w = NewWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	n, err := w.WriteHeader("name", 1)
 	is.True(err != nil)
+	is.Equal(n, 0)
 }
 
 func TestWriter_WriteHeader_WriteNameError(t *testing.T) {
@@ -98,8 +103,9 @@ func TestWriter_WriteHeader_WriteNameError(t *testing.T) {
 		w = NewWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	n, err := w.WriteHeader("name", 1)
 	is.True(err != nil)
+	is.Equal(n, sizeWriteSize(len("name")))
 }
 
 func TestWriter_Write_WriteError(t *testing.T) {
@@ -114,10 +120,11 @@ func TestWriter_Write_WriteError(t *testing.T) {
 		w = NewWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	n, err := w.WriteHeader("name", 1)
 	is.NoErr(err)
+	is.Equal(n, headerSize("name", 1))
 
-	n, err := w.Write([]byte{10})
+	n, err = w.Write([]byte{10})
 	is.True(err != nil)
 	is.Equal(0, n)
 }
@@ -135,4 +142,9 @@ func TestWriter_Close_PadWriteError(t *testing.T) {
 
 	err := w.Close()
 	is.True(err != nil)
+}
+
+func headerSize(name string, contentSize int) int {
+	l := len(name)
+	return sizeWriteSize(l) + l + sizeWriteSize(contentSize)
 }

@@ -56,7 +56,7 @@ func TestCoherence(t *testing.T) {
 				w = NewWriter(buf)
 			)
 			for name, contents := range files {
-				err := w.WriteHeader(name, int64(len(contents)))
+				_, err := w.WriteHeader(name, int64(len(contents)))
 				is.NoErr(err)
 				_, err = w.Write(contents)
 				is.NoErr(err)
