@@ -4,9 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-
-	"golang.org/x/exp/constraints"
 )
 
 var (
@@ -26,7 +23,7 @@ func NewWriter(w io.Writer) *Writer {
 	}
 }
 
-func (wtr *Writer) WriteHeader(name string, contentLength int64) (int, error) {
+func (wtr *Writer) WriteHeader(name string, contentLength int64, data map[string][]string) (int, error) {
 	var (
 		w = wtr.w
 		n int
@@ -46,21 +43,13 @@ func (wtr *Writer) WriteHeader(name string, contentLength int64) (int, error) {
 		return n, fmt.Errorf("error padding file: %w", err)
 	}
 
-	var nameLength = int64(len(name))
-
-	m, err = wtr.writeSize(nameLength)
-	n += m
-	if err != nil {
-		return n, err
+	h := Header{
+		Name: name,
+		Size: uint64(contentLength),
+		Data: data,
 	}
-
-	m, err = w.Write([]byte(name))
-	n += m
-	if err != nil {
-		return n, err
-	}
-
-	m, err = wtr.writeSize(contentLength)
+	payload := EncodeHeader(h)
+	m, err = wtr.w.Write(payload)
 	n += m
 	if err != nil {
 		return n, err
@@ -122,37 +111,4 @@ func (wtr *Writer) Close() error {
 
 func (wtr *Writer) pad() (int, error) {
 	return wtr.w.Write(make([]byte, wtr.contentLength))
-}
-
-func (wtr *Writer) writeSize(size int64) (int, error) {
-	if size < 0 {
-		return 0, ErrInvalidSize
-	}
-
-	var (
-		n   = sizeWriteSize(size)
-		buf = make([]byte, n)
-	)
-
-	for idx := n - 1; -1 < idx; idx-- {
-		// grab the lowest 7 bits
-		var b byte = byte(size & 0b01111111)
-		size >>= 7
-
-		// shift to the right to free the low bit
-		b <<= 1
-
-		// set the low bit high if we're done encoding
-		if idx == n-1 {
-			b |= 1
-		}
-
-		buf[idx] = b
-	}
-
-	return wtr.w.Write(buf)
-}
-
-func sizeWriteSize[N constraints.Integer](size N) int {
-	return int(math.Floor(math.Log2(float64(size)))/7 + 1)
 }

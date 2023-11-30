@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/matryer/is"
@@ -18,7 +19,7 @@ func TestTOCWriter_ErrClosed(t *testing.T) {
 	err := w.Close()
 	is.True(errors.Is(err, ErrClosed))
 
-	err = w.WriteHeader("", 1)
+	err = w.WriteHeader("", 1, nil)
 	is.True(errors.Is(err, ErrClosed))
 
 	n, err := w.Write([]byte{10})
@@ -33,7 +34,7 @@ func TestTOCWriter_ErrWriteTooLong(t *testing.T) {
 		w   = NewTOCWriter(buf)
 	)
 
-	err := w.WriteHeader("name", 1)
+	err := w.WriteHeader("name", 1, nil)
 	is.NoErr(err)
 
 	n, err := w.Write([]byte{10, 10})
@@ -52,7 +53,7 @@ func TestTOCWriter_NegativeContentSize(t *testing.T) {
 		w   = NewTOCWriter(buf)
 	)
 
-	err := w.WriteHeader("name", -1)
+	err := w.WriteHeader("name", -1, nil)
 	is.True(errors.Is(err, ErrInvalidSize))
 }
 
@@ -67,7 +68,7 @@ func TestTOCWriter_WriteHeader_PadError(t *testing.T) {
 		w = NewTOCWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	err := w.WriteHeader("name", 1, nil)
 	is.True(err != nil)
 }
 
@@ -83,44 +84,8 @@ func TestTOCWriter_WriteHeader_WriteNameLengthError(t *testing.T) {
 		w = NewTOCWriter(&ew)
 	)
 
-	err := w.WriteHeader("name", 1)
+	err := w.WriteHeader("name", 1, nil)
 	is.True(err != nil)
-}
-
-func TestTOCWriter_WriteHeader_WriteNameError(t *testing.T) {
-	var (
-		is = is.New(t)
-		ew = errWriter{
-			errors: []error{
-				nil, nil,
-				errors.New("ERROR"),
-			},
-		}
-		w = NewTOCWriter(&ew)
-	)
-
-	err := w.WriteHeader("name", 1)
-	is.True(err != nil)
-}
-
-func TestTOCWriter_Write_WriteError(t *testing.T) {
-	var (
-		is = is.New(t)
-		ew = errWriter{
-			errors: []error{
-				nil, nil, nil, nil,
-				errors.New("ERROR"),
-			},
-		}
-		w = NewTOCWriter(&ew)
-	)
-
-	err := w.WriteHeader("name", 1)
-	is.NoErr(err)
-
-	n, err := w.Write([]byte{10})
-	is.True(err != nil)
-	is.Equal(0, n)
 }
 
 func TestTOCWriter_Close_PadWriteError(t *testing.T) {
@@ -167,27 +132,25 @@ func TestTOCWriter_TableOfContents(t *testing.T) {
 					"a.txt": []byte("a.txt contents"),
 				},
 			},
-			/*
-				{
-					name: "multiple_files",
-					files: map[string][]byte{
-						"a.txt":     []byte("a.txt contents"),
-						"foo/b.txt": []byte("foo/b.txt contents"),
-					},
+			{
+				name: "multiple_files",
+				files: map[string][]byte{
+					"a.txt":     []byte("a.txt contents"),
+					"foo/b.txt": []byte("foo/b.txt contents"),
 				},
-				{
-					name: "long_name",
-					files: map[string][]byte{
-						strings.Repeat("a", 1024) + ".txt": []byte("a.txt contents"),
-					},
+			},
+			{
+				name: "long_name",
+				files: map[string][]byte{
+					strings.Repeat("a", 1024) + ".txt": []byte("a.txt contents"),
 				},
-				{
-					name: "long_contents",
-					files: map[string][]byte{
-						"a.txt": []byte(strings.Repeat("a", 4017)),
-					},
+			},
+			{
+				name: "long_contents",
+				files: map[string][]byte{
+					"a.txt": []byte(strings.Repeat("a", 4017)),
 				},
-			*/
+			},
 		}
 	)
 
@@ -202,7 +165,7 @@ func TestTOCWriter_TableOfContents(t *testing.T) {
 				w = NewTOCWriter(buf)
 			)
 			for name, contents := range files {
-				err := w.WriteHeader(name, int64(len(contents)))
+				err := w.WriteHeader(name, int64(len(contents)), nil)
 				is.NoErr(err)
 				_, err = w.Write(contents)
 				is.NoErr(err)

@@ -3,7 +3,6 @@ package pitch
 import (
 	"fmt"
 	"io"
-	"math"
 )
 
 type ByteRange struct {
@@ -11,7 +10,14 @@ type ByteRange struct {
 	End   int64
 }
 
-type TableOfContents map[string]ByteRange
+type HeaderItem struct {
+	Size  uint64
+	Data  map[string][]string
+	Start int64
+	End   int64
+}
+
+type TableOfContents map[string]*HeaderItem
 
 type TOCWriter struct {
 	contentLength int64
@@ -27,35 +33,35 @@ func NewTOCWriter(w io.Writer) *TOCWriter {
 	}
 }
 
-func (wtr *TOCWriter) WriteHeader(name string, contentLength int64) error {
+func (wtr *TOCWriter) WriteHeader(name string, contentLength int64, data map[string][]string) error {
 	var w = wtr.w
 	if w == nil {
 		return ErrClosed
+	}
+	if contentLength < 1 {
+		return ErrInvalidSize
 	}
 
 	if err := wtr.pad(); err != nil {
 		return fmt.Errorf("error padding file: %w", err)
 	}
 
-	var nameLength = int64(len(name))
-
-	if err := wtr.writeSize(nameLength); err != nil {
-		return err
+	hdr := Header{
+		Name: name,
+		Size: uint64(contentLength),
+		Data: data,
 	}
-
-	n, err := w.Write([]byte(name))
+	payload := EncodeHeader(hdr)
+	wtr.offset += int64(len(payload))
+	_, err := w.Write(payload)
 	if err != nil {
 		return err
 	}
 
-	wtr.offset += int64(n)
-
-	if err := wtr.writeSize(contentLength); err != nil {
-		return err
-	}
-
 	wtr.contentLength = contentLength
-	wtr.toc[name] = ByteRange{
+	wtr.toc[name] = &HeaderItem{
+		Size:  uint64(contentLength),
+		Data:  nil,
 		Start: wtr.offset,
 		End:   wtr.offset + contentLength,
 	}
@@ -121,42 +127,6 @@ func (wtr *TOCWriter) pad() error {
 	)
 
 	wtr.offset += int64(cl)
-
-	return err
-}
-
-func (wtr *TOCWriter) writeSize(size int64) error {
-	if size < 1 {
-		return ErrInvalidSize
-	}
-
-	var (
-		n   = int(math.Floor(math.Log2(float64(size)))/7 + 1)
-		buf = make([]byte, n)
-	)
-
-	for idx := n - 1; -1 < idx; idx-- {
-		// grab the lowest 7 bits
-		var b byte = byte(size & 0b01111111)
-		size >>= 7
-
-		// shift to the right to free the low bit
-		b <<= 1
-
-		// set the low bit high if we're done encoding
-		if idx == n-1 {
-			b |= 1
-		}
-
-		buf[idx] = b
-	}
-
-	var m, err = wtr.w.Write(buf)
-	if err != nil {
-		return err
-	}
-
-	wtr.offset += int64(m)
 
 	return err
 }

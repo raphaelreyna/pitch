@@ -6,13 +6,25 @@ import (
 	"io"
 )
 
-type Reader struct {
+type Reader interface {
+	Next() (*Header, error)
+	Read(b []byte) (int, error)
+	Close() error
+}
+
+type internalReader interface {
+	Reader
+	reader() io.Reader
+	discardContent() error
+}
+
+type reader struct {
 	r             io.Reader
 	contentReader io.LimitedReader
 }
 
-func NewReader(r io.Reader) *Reader {
-	return &Reader{
+func NewReader(r io.Reader) Reader {
+	return &reader{
 		r: r,
 		contentReader: io.LimitedReader{
 			R: r,
@@ -20,44 +32,26 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-func (rdr *Reader) Next() (name string, size int64, err error) {
+func (rdr *reader) Next() (*Header, error) {
 	if err := rdr.discardContent(); err != nil {
-		return "", 0, fmt.Errorf("error reading the next header: %w", err)
+		return nil, fmt.Errorf("error discarding content: %w", err)
 	}
 
-	s, _, err := rdr.readSize()
-	if errors.Is(err, io.EOF) {
-		return "", 0, err
-	}
+	hdr, err := DecodeHeader(rdr.r)
 	if err != nil {
-		return "", 0, fmt.Errorf("error reading file name size: %w", err)
+		return nil, fmt.Errorf("error reading the next header: %w", err)
 	}
 
-	var (
-		r       = rdr.r
-		nameBuf = make([]byte, s)
-	)
+	rdr.contentReader.N = int64(hdr.Size)
 
-	_, err = io.ReadFull(r, nameBuf)
-	if err != nil {
-		return "", 0, fmt.Errorf("error reading header byte: %w", err)
-	}
-
-	s, _, err = rdr.readSize()
-	if err != nil {
-		return "", 0, fmt.Errorf("error reading file size: %w", err)
-	}
-
-	rdr.contentReader.N = s
-
-	return string(nameBuf), s, nil
+	return hdr, nil
 }
 
-func (rdr *Reader) Read(b []byte) (int, error) {
+func (rdr *reader) Read(b []byte) (int, error) {
 	return rdr.contentReader.Read(b)
 }
 
-func (rdr *Reader) discardContent() error {
+func (rdr *reader) discardContent() error {
 	var (
 		r = rdr.r
 		n = rdr.contentReader.N
@@ -71,41 +65,11 @@ func (rdr *Reader) discardContent() error {
 	return err
 }
 
-func (rdr *Reader) readSize() (int64, int64, error) {
-	const lbMask = 0b00000001
-	var (
-		r    = rdr.r
-		size int64
-		buf  = make([]byte, 1)
-		n    int64
-	)
-
-	for {
-		_, err := r.Read(buf)
-		if err != nil {
-			return 0, 0, err
-		}
-
-		n++
-
-		var (
-			x   = buf[0]
-			end = x&lbMask == lbMask
-		)
-
-		size <<= 8
-		size |= int64(x)
-		size >>= 1
-
-		if end {
-			break
-		}
-	}
-
-	return size, n, nil
+func (rdr *reader) reader() io.Reader {
+	return rdr.r
 }
 
-func (r *Reader) Close() error {
+func (r *reader) Close() error {
 	var c, ok = r.r.(io.Closer)
 	if ok {
 		return c.Close()

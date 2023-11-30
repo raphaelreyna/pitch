@@ -16,14 +16,16 @@ func TestReader_ReadSize_DiscardErr(t *testing.T) {
 				errors.New("ERROR"),
 			},
 		}
-		r = NewReader(&er)
+		r      = NewReader(&er)
+		rr, ok = r.(*reader)
 	)
+	is.True(ok)
 
-	r.contentReader.N = 1
+	rr.contentReader.N = 1
 
-	name, _, err := r.Next()
+	hdr, err := r.Next()
 	is.True(err != nil)
-	is.Equal(name, "")
+	is.True(hdr == nil)
 }
 
 func TestReader_ReadSize_DiscardEOF(t *testing.T) {
@@ -35,14 +37,16 @@ func TestReader_ReadSize_DiscardEOF(t *testing.T) {
 				io.EOF,
 			},
 		}
-		r = NewReader(&er)
+		r      = NewReader(&er)
+		rr, ok = r.(*reader)
 	)
+	is.True(ok)
 
-	r.contentReader.N = 1
+	rr.contentReader.N = 1
 
-	name, _, err := r.Next()
+	hdr, err := r.Next()
 	is.True(err != nil)
-	is.Equal(name, "")
+	is.True(hdr == nil)
 }
 
 func TestReader_ReadSizeEOF(t *testing.T) {
@@ -57,9 +61,9 @@ func TestReader_ReadSizeEOF(t *testing.T) {
 		r = NewReader(&er)
 	)
 
-	name, _, err := r.Next()
+	hdr, err := r.Next()
 	is.True(err != nil)
-	is.Equal(name, "")
+	is.True(hdr == nil)
 }
 
 func TestReader_ReadSizeErr(t *testing.T) {
@@ -74,9 +78,9 @@ func TestReader_ReadSizeErr(t *testing.T) {
 		r = NewReader(&er)
 	)
 
-	name, _, err := r.Next()
+	hdr, err := r.Next()
 	is.True(err != nil)
-	is.Equal(name, "")
+	is.True(hdr == nil)
 }
 
 type errReader struct {

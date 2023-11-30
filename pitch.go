@@ -3,122 +3,55 @@ package pitch
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 )
 
-func BuildTableOfContents(v interface{}) (TableOfContents, error) {
+func BuildTableOfContents(v any) (TableOfContents, error) {
 	switch x := v.(type) {
 	case []byte:
 		var buf = bytes.NewReader(x)
-		return buildTableOfContentsFromSeeker(buf)
-	case io.ReadSeeker:
-		return buildTableOfContentsFromSeeker(x)
-	case io.Reader:
+		return buildTableOfContentsFromReader(NewReader(buf))
+	case Reader:
 		return buildTableOfContentsFromReader(x)
+	case io.Reader:
+		return buildTableOfContentsFromReader(NewReader(x))
 	}
 
-	return nil, errors.New("expected []byte, io.Reader or io.ReadSeeker")
+	return nil, errors.New("expected []byte, Reader or io.Reader")
 }
 
-func buildTableOfContentsFromReader(r io.Reader) (TableOfContents, error) {
+func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 	var (
 		toc    = make(TableOfContents)
-		pr     = NewReader(r)
 		offset int64
 	)
 
 	for {
-		var bytesRead int64
-
-		nameSize, br, err := pr.readSize()
-		if errors.Is(err, io.EOF) {
-			return toc, nil
-		}
+		hdr, err := r.Next()
 		if err != nil {
-			return nil, err
+			if errors.Is(err, io.EOF) {
+				if len(toc) == 0 {
+					return nil, io.EOF
+				}
+				return toc, nil
+			}
+			return nil, fmt.Errorf("error reading header: %w", err)
 		}
 
-		bytesRead += br
+		headerSize := int64(EncodedHeaderSize(hdr.Name, hdr.Size, hdr.Data))
+		filesize := headerSize + int64(hdr.Size)
 
-		var nameBuf = make([]byte, nameSize)
-		_, err = io.ReadFull(pr.r, nameBuf)
-		if err != nil {
-			return nil, err
+		toc[hdr.Name] = &HeaderItem{
+			Size:  hdr.Size,
+			Data:  hdr.Data,
+			Start: offset + headerSize,
+			End:   offset + filesize,
 		}
-
-		bytesRead += nameSize
-
-		contentSize, br, err := pr.readSize()
-		if err != nil {
-			return nil, err
-		}
-
-		bytesRead += br
-		offset += bytesRead
-
-		_, err = io.CopyN(io.Discard, r, contentSize)
-		if err != nil {
-			return nil, err
-		}
-
-		toc[string(nameBuf)] = ByteRange{
-			Start: offset,
-			End:   offset + contentSize,
-		}
-
-		offset += contentSize
-	}
-}
-
-func buildTableOfContentsFromSeeker(r io.ReadSeeker) (TableOfContents, error) {
-	var (
-		toc    = make(TableOfContents)
-		pr     = NewReader(r)
-		offset int64
-	)
-
-	for {
-		var bytesRead int64
-
-		nameSize, br, err := pr.readSize()
-		if errors.Is(err, io.EOF) {
-			return toc, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		bytesRead += br
-
-		var nameBuf = make([]byte, nameSize)
-		_, err = io.ReadFull(pr.r, nameBuf)
-		if err != nil {
-			return nil, err
-		}
-
-		bytesRead += nameSize
-
-		contentSize, br, err := pr.readSize()
-		if err != nil {
-			return nil, err
-		}
-
-		bytesRead += br
-		offset += bytesRead
-
-		if _, err := r.Seek(offset+contentSize, 0); err != nil {
-			return nil, err
-		}
-
-		toc[string(nameBuf)] = ByteRange{
-			Start: offset,
-			End:   offset + contentSize,
-		}
-
-		offset += contentSize
+		offset += filesize
 	}
 }
 
@@ -135,7 +68,7 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 			return nil
 		}
 
-		if _, err := pw.WriteHeader(path, info.Size()); err != nil {
+		if _, err := pw.WriteHeader(path, info.Size(), nil); err != nil {
 			return err
 		}
 
