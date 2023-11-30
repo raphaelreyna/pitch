@@ -8,7 +8,7 @@ import (
 
 type Reader interface {
 	Next() (*Header, error)
-	Read(b []byte) (int, error)
+	Read([]byte) (int, error)
 	Close() error
 }
 
@@ -56,6 +56,18 @@ func (rdr *reader) discardContent() error {
 		r = rdr.r
 		n = rdr.contentReader.N
 	)
+
+	if n == 0 {
+		return nil
+	}
+
+	if seeker, ok := r.(io.Seeker); ok {
+		_, err := seeker.Seek(n, io.SeekCurrent)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
 
 	_, err := io.CopyN(io.Discard, r, n)
 	if errors.Is(err, io.EOF) {
