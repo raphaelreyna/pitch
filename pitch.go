@@ -46,6 +46,7 @@ func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 		filesize := headerSize + int64(hdr.Size)
 
 		toc[hdr.Name] = &HeaderItem{
+			Name:  hdr.Name,
 			Size:  hdr.Size,
 			Data:  hdr.Data,
 			Start: offset + headerSize,
@@ -55,11 +56,8 @@ func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 	}
 }
 
-func ArchiveDir(dst io.WriteCloser, dir string) error {
-	var pw = NewWriter(dst)
-	defer pw.Close()
-
-	return filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+func WalkFunc(w *Writer, dir string) filepath.WalkFunc {
+	return func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -68,7 +66,7 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 			return nil
 		}
 
-		if _, err := pw.WriteHeader(path, info.Size(), nil); err != nil {
+		if _, err := w.WriteHeader(path, info.Size(), nil); err != nil {
 			return err
 		}
 
@@ -77,7 +75,7 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 			return err
 		}
 
-		if _, err := io.Copy(pw, file); err != nil {
+		if _, err := io.Copy(w, file); err != nil {
 			file.Close()
 
 			return err
@@ -88,5 +86,12 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 		}
 
 		return nil
-	})
+	}
+}
+
+func ArchiveDir(dst io.WriteCloser, dir string) error {
+	var pw = NewWriter(dst)
+	defer pw.Close()
+
+	return filepath.Walk(dir, WalkFunc(pw, dir))
 }
