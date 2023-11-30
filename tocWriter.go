@@ -10,14 +10,64 @@ type ByteRange struct {
 	End   int64
 }
 
+// HeaderItem is a struct that contains information about a file.
+// In each archive file, a file's header is followed by its content.
 type HeaderItem struct {
-	Size  uint64
-	Data  map[string][]string
-	Start int64
-	End   int64
+	Name string `json:"name" yaml:"name"`
+	// Size is the size of the file content in bytes.
+	Size uint64 `json:"size" yaml:"size"`
+	// Data is a user-defined map of key-value pairs.
+	Data map[string][]string `json:"data,omitempty" yaml:"data,omitempty"`
+	// Start is the byte offset of the file content.
+	Start int64 `json:"start" yaml:"start"`
+	// End is the byte offset of the end of the file content.
+	End int64 `json:"end" yaml:"end"`
 }
 
+// TableOfContents is a map of file names to HeaderItems.
 type TableOfContents map[string]*HeaderItem
+
+func TableToList[T ListOfContents | ListOfContentsByName | ListOfContentsByLocation](toc TableOfContents) T {
+	var (
+		loc = make(T, 0, len(toc))
+	)
+
+	for _, v := range toc {
+		loc = append(loc, v)
+	}
+
+	return loc
+}
+
+type ListOfContents []*HeaderItem
+
+type ListOfContentsByName []*HeaderItem
+
+func (loc ListOfContentsByName) Len() int {
+	return len(loc)
+}
+
+func (loc ListOfContentsByName) Less(i, j int) bool {
+	return loc[i].Name < loc[j].Name
+}
+
+func (loc ListOfContentsByName) Swap(i, j int) {
+	loc[i], loc[j] = loc[j], loc[i]
+}
+
+type ListOfContentsByLocation []*HeaderItem
+
+func (loc ListOfContentsByLocation) Len() int {
+	return len(loc)
+}
+
+func (loc ListOfContentsByLocation) Less(i, j int) bool {
+	return loc[i].Start < loc[j].Start
+}
+
+func (loc ListOfContentsByLocation) Swap(i, j int) {
+	loc[i], loc[j] = loc[j], loc[i]
+}
 
 type TOCWriter struct {
 	contentLength int64
@@ -60,6 +110,7 @@ func (wtr *TOCWriter) WriteHeader(name string, contentLength int64, data map[str
 
 	wtr.contentLength = contentLength
 	wtr.toc[name] = &HeaderItem{
+		Name:  name,
 		Size:  uint64(contentLength),
 		Data:  nil,
 		Start: wtr.offset,
