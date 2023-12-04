@@ -56,33 +56,37 @@ func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 	}
 }
 
-func WalkFunc(w *Writer, dir string) filepath.WalkFunc {
-	return func(path string, info fs.FileInfo, err error) error {
+func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
+	return func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if entry.IsDir() {
 			return nil
 		}
 
-		if _, err := w.WriteHeader(path, info.Size(), nil); err != nil {
-			return err
+		info, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("error getting file info: %w", err)
 		}
 
-		file, err := os.Open(filepath.Join(dir, path))
+		if _, err := w.WriteHeader(path, info.Size(), nil); err != nil {
+			return fmt.Errorf("error writing header: %w", err)
+		}
+
+		file, err := os.Open(path)
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening file: %w", err)
 		}
 
 		if _, err := io.Copy(w, file); err != nil {
 			file.Close()
-
-			return err
+			return fmt.Errorf("error copying file: %w", err)
 		}
 
 		if err := file.Close(); err != nil {
-			return err
+			return fmt.Errorf("error closing file: %w", err)
 		}
 
 		return nil
@@ -93,5 +97,5 @@ func ArchiveDir(dst io.WriteCloser, dir string) error {
 	var pw = NewWriter(dst)
 	defer pw.Close()
 
-	return filepath.Walk(dir, WalkFunc(pw, dir))
+	return filepath.WalkDir(dir, WalkDirFunc(pw, dir))
 }
