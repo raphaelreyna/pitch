@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func BuildTableOfContents(v any) (TableOfContents, error) {
@@ -57,6 +58,7 @@ func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 }
 
 func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
+	dir = filepath.Clean(dir) + string(filepath.Separator)
 	return func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -71,7 +73,8 @@ func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
 			return fmt.Errorf("error getting file info: %w", err)
 		}
 
-		if _, err := w.WriteHeader(path, info.Size(), nil); err != nil {
+		headerName := strings.TrimPrefix(path, dir)
+		if _, err := w.WriteHeader(headerName, info.Size(), nil); err != nil {
 			return fmt.Errorf("error writing header: %w", err)
 		}
 
