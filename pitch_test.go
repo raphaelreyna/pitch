@@ -3,6 +3,8 @@ package pitch
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -257,3 +259,89 @@ func TestBuildTableOfContents_CatReader(t *testing.T) {
 		})
 	}
 }
+
+func TestArchiveDir(t *testing.T) {
+	var (
+		is = is.New(t)
+
+		tests = []struct {
+			name  string
+			files map[string][]byte
+		}{
+			{
+				name: "basic",
+				files: map[string][]byte{
+					"a.txt": []byte("AAA"),
+				},
+			},
+			{
+				name: "multiple_files",
+				files: map[string][]byte{
+					"a.txt": []byte("AAA"),
+					"b.txt": []byte("BBB"),
+				},
+			},
+			{
+				name: "multiple_dirs",
+				files: map[string][]byte{
+					"a.txt":            []byte("AAA"),
+					"foo/b.txt":        []byte("BBB"),
+					"foo/bar/c.txt":    []byte("CCC"),
+					"foo1/b1.txt":      []byte("BBB"),
+					"foo1/bar1/c1.txt": []byte("CCC"),
+				},
+			},
+		}
+	)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				is    = is.New(t)
+				files = test.files
+
+				buf = bytes.NewBuffer(nil)
+
+				tempDir     = t.TempDir()
+				tempDirName = filepath.Base(tempDir)
+			)
+
+			err := createTestDir(tempDir, files)
+			is.NoErr(err)
+
+			err = ArchiveDir(&nopCloser{buf}, tempDir)
+			is.NoErr(err)
+
+			toc, err := BuildTableOfContents(buf)
+			is.NoErr(err)
+
+			for fileName := range files {
+				_, ok := toc[tempDirName+"/"+fileName]
+				is.Equal(ok, true)
+			}
+		})
+	}
+}
+
+func createTestDir(root string, files map[string][]byte) error {
+	for name, contents := range files {
+		fileName := filepath.Join(root, name)
+		base := filepath.Dir(fileName)
+		err := os.MkdirAll(base, 0755)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(fileName, contents, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type nopCloser struct {
+	io.Writer
+}
+
+func (*nopCloser) Close() error { return nil }

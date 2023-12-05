@@ -58,8 +58,9 @@ func buildTableOfContentsFromReader(r Reader) (TableOfContents, error) {
 }
 
 func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
-	dir = filepath.Clean(dir) + string(filepath.Separator)
+	dir = filepath.Clean(dir)
 	dirParent := filepath.Dir(dir)
+	sep := string(filepath.Separator)
 	return func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -74,9 +75,9 @@ func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
 			return fmt.Errorf("error getting file info: %w", err)
 		}
 
-		headerName := strings.TrimPrefix(path, dirParent)
+		headerName := strings.TrimPrefix(path, dirParent+sep)
 		if _, err := w.WriteHeader(headerName, info.Size(), nil); err != nil {
-			return fmt.Errorf("error writing header: %w", err)
+			return fmt.Errorf("error writing header (%s, %d): %w", headerName, info.Size(), err)
 		}
 
 		file, err := os.Open(path)
