@@ -75,8 +75,22 @@ func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
 			return fmt.Errorf("error getting file info: %w", err)
 		}
 
+		// follow symlinks
 		headerName := strings.TrimPrefix(path, dirParent+sep)
-		if _, err := w.WriteHeader(headerName, info.Size(), nil); err != nil {
+		size := info.Size()
+		if entry.Type()&fs.ModeSymlink != 0 {
+			path, err = os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("error reading symlink: %w", err)
+			}
+			stat, err := os.Stat(path)
+			if err != nil {
+				return fmt.Errorf("error getting file info: %w", err)
+			}
+			size = stat.Size()
+		}
+
+		if _, err := w.WriteHeader(headerName, size, nil); err != nil {
 			return fmt.Errorf("error writing header (%s, %d): %w", headerName, info.Size(), err)
 		}
 
@@ -87,7 +101,7 @@ func WalkDirFunc(w *Writer, dir string) fs.WalkDirFunc {
 
 		if _, err := io.Copy(w, file); err != nil {
 			file.Close()
-			return fmt.Errorf("error copying file: %w", err)
+			return fmt.Errorf("error copying file [%s]: %w", path, err)
 		}
 
 		if err := file.Close(); err != nil {

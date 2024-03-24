@@ -72,7 +72,7 @@ func (wtr *Writer) Write(b []byte) (int, error) {
 	)
 
 	if cl == 0 {
-		return 0, ErrWriteTooLong
+		return 0, fmt.Errorf("%w: %d", ErrWriteTooLong, n)
 	}
 
 	var isTooLong bool
@@ -89,7 +89,7 @@ func (wtr *Writer) Write(b []byte) (int, error) {
 	wtr.contentLength -= int64(m)
 
 	if isTooLong {
-		err = ErrWriteTooLong
+		err = fmt.Errorf("%w: %d", ErrWriteTooLong, n)
 	}
 
 	return m, err

@@ -306,7 +306,9 @@ func TestArchiveDir(t *testing.T) {
 				tempDirName = filepath.Base(tempDir)
 			)
 
-			err := createTestDir(tempDir, files)
+			err := createTestDir(tempDir, files, map[string]string{
+				"go.mod": "./go.mod",
+			})
 			is.NoErr(err)
 
 			err = ArchiveDir(&nopCloser{buf}, tempDir)
@@ -323,7 +325,7 @@ func TestArchiveDir(t *testing.T) {
 	}
 }
 
-func createTestDir(root string, files map[string][]byte) error {
+func createTestDir(root string, files map[string][]byte, symlinks map[string]string) error {
 	for name, contents := range files {
 		fileName := filepath.Join(root, name)
 		base := filepath.Dir(fileName)
@@ -332,6 +334,19 @@ func createTestDir(root string, files map[string][]byte) error {
 			return err
 		}
 		err = os.WriteFile(fileName, contents, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	for link, target := range symlinks {
+		linkName := filepath.Join(root, link)
+		base := filepath.Dir(linkName)
+		err := os.MkdirAll(base, 0755)
+		if err != nil {
+			return err
+		}
+		err = os.Symlink(target, linkName)
 		if err != nil {
 			return err
 		}
