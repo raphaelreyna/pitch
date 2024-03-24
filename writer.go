@@ -37,19 +37,13 @@ func (wtr *Writer) WriteHeader(name string, contentLength int64, data map[string
 		return 0, ErrInvalidSize
 	}
 
-	m, err := wtr.pad()
-	n += m
-	if err != nil {
-		return n, fmt.Errorf("error padding file: %w", err)
-	}
-
 	h := Header{
 		Name: name,
 		Size: uint64(contentLength),
 		Data: data,
 	}
 	payload := EncodeHeader(h)
-	m, err = wtr.w.Write(payload)
+	m, err := wtr.w.Write(payload)
 	n += m
 	if err != nil {
 		return n, err
@@ -100,15 +94,7 @@ func (wtr *Writer) Close() error {
 		return ErrClosed
 	}
 
-	if _, err := wtr.pad(); err != nil {
-		return fmt.Errorf("error padding file: %w", err)
-	}
-
 	wtr.w = nil
 
 	return nil
-}
-
-func (wtr *Writer) pad() (int, error) {
-	return wtr.w.Write(make([]byte, wtr.contentLength))
 }

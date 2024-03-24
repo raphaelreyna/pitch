@@ -59,7 +59,6 @@ func TestWriter_WriteHeader_WriteNameLengthError(t *testing.T) {
 		is = is.New(t)
 		ew = errWriter{
 			errors: []error{
-				nil,
 				errors.New("ERROR"),
 			},
 		}
